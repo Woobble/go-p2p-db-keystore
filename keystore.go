@@ -7,6 +7,7 @@ import (
 	"github.com/Woobble/go-p2p-db-keystore/verifier"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/syndtr/goleveldb/leveldb"
+	"io/fs"
 	"os"
 )
 
@@ -124,9 +125,11 @@ func (k *Keystore) Close() error {
 }
 
 func createStore(path string) (*leveldb.DB, error) {
-	_, err := os.Create(path)
-	if err != nil {
-		return nil, err
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		err := os.Mkdir(path, fs.ModePerm)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return leveldb.OpenFile(path, nil)
 }
