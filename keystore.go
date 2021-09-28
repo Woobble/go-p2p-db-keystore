@@ -16,7 +16,6 @@ var errNoId = errors.New("id needed to check a key")
 type Keystore struct {
 	path  string
 	store *leveldb.DB
-	cache map[string][]byte
 }
 
 type keys struct {
@@ -50,20 +49,15 @@ func (k *Keystore) GetKey(id []byte) (crypto.PrivKey, crypto.PubKey, error) {
 	if k.store == nil {
 		return nil, nil, nil
 	}
-	serializedKeys, ok := k.cache[string(id)]
-	if !ok {
-		var err error
-		if serializedKeys, err = k.store.Get(id, nil); err != nil {
-			return nil, nil, err
-		}
-	}
-
-	deserializedKeys := &keys{}
-	if err := json.Unmarshal(serializedKeys, deserializedKeys); err != nil {
+	serializedKeys, err := k.store.Get(id, nil)
+	if err != nil {
 		return nil, nil, err
 	}
 
-	k.cache[string(id)] = serializedKeys
+	deserializedKeys := &keys{}
+	if err = json.Unmarshal(serializedKeys, deserializedKeys); err != nil {
+		return nil, nil, err
+	}
 
 	return deserializedKeys.privKey, deserializedKeys.pubKey, nil
 }
@@ -96,8 +90,6 @@ func (k *Keystore) CreateKey(id, entropy []byte) (crypto.PrivKey, crypto.PubKey,
 		return nil, nil, err
 	}
 
-	k.cache[string(id)] = serializedKeys
-
 	return privKey, pubKey, nil
 }
 
@@ -126,7 +118,7 @@ func (k *Keystore) Close() error {
 
 func createStore(path string) (*leveldb.DB, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		err := os.Mkdir(path, fs.ModePerm)
+		err = os.Mkdir(path, fs.ModePerm)
 		if err != nil {
 			return nil, err
 		}
@@ -139,8 +131,7 @@ func New(path string) (*Keystore, error) {
 		path = "./keystore"
 	}
 	return &Keystore{
-		path:  path,
-		cache: make(map[string][]byte),
+		path: path,
 	}, nil
 }
 
